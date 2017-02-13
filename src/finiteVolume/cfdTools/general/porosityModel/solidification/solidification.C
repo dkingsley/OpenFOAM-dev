@@ -2,7 +2,7 @@
   =========                 |
   \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
    \\    /   O peration     |
-    \\  /    A nd           | Copyright (C) 2012-2017 OpenFOAM Foundation
+    \\  /    A nd           | Copyright (C) 2017 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
 License
@@ -24,7 +24,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "addToRunTimeSelectionTable.H"
-#include "powerLaw.H"
+#include "solidification.H"
 #include "geometricOneField.H"
 #include "fvMatrices.H"
 
@@ -34,15 +34,15 @@ namespace Foam
 {
     namespace porosityModels
     {
-        defineTypeNameAndDebug(powerLaw, 0);
-        addToRunTimeSelectionTable(porosityModel, powerLaw, mesh);
+        defineTypeNameAndDebug(solidification, 0);
+        addToRunTimeSelectionTable(porosityModel, solidification, mesh);
     }
 }
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::porosityModels::powerLaw::powerLaw
+Foam::porosityModels::solidification::solidification
 (
     const word& name,
     const word& modelType,
@@ -52,27 +52,26 @@ Foam::porosityModels::powerLaw::powerLaw
 )
 :
     porosityModel(name, modelType, mesh, dict, cellZoneName),
-    C0_(readScalar(coeffs_.lookup("C0"))),
-    C1_(readScalar(coeffs_.lookup("C1"))),
-    rhoName_(coeffs_.lookupOrDefault<word>("rho", "rho"))
+    TName_(coeffs_.lookupOrDefault<word>("T", "T")),
+    alphaName_(coeffs_.lookupOrDefault<word>("alpha", "none")),
+    rhoName_(coeffs_.lookupOrDefault<word>("rho", "rho")),
+    D_(Function1<scalar>::New("D", coeffs_))
 {}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
-Foam::porosityModels::powerLaw::~powerLaw()
+Foam::porosityModels::solidification::~solidification()
 {}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void Foam::porosityModels::powerLaw::calcTransformModelData()
-{
-    // nothing to be transformed
-}
+void Foam::porosityModels::solidification::calcTransformModelData()
+{}
 
 
-void Foam::porosityModels::powerLaw::calcForce
+void Foam::porosityModels::solidification::calcForce
 (
     const volVectorField& U,
     const volScalarField& rho,
@@ -89,7 +88,7 @@ void Foam::porosityModels::powerLaw::calcForce
 }
 
 
-void Foam::porosityModels::powerLaw::correct
+void Foam::porosityModels::solidification::correct
 (
     fvVectorMatrix& UEqn
 ) const
@@ -114,14 +113,14 @@ void Foam::porosityModels::powerLaw::correct
 }
 
 
-void Foam::porosityModels::powerLaw::correct
+void Foam::porosityModels::solidification::correct
 (
     fvVectorMatrix& UEqn,
     const volScalarField& rho,
     const volScalarField& mu
 ) const
 {
-    const vectorField& U = UEqn.psi();
+    const volVectorField& U = UEqn.psi();
     const scalarField& V = mesh_.V();
     scalarField& Udiag = UEqn.diag();
 
@@ -129,7 +128,7 @@ void Foam::porosityModels::powerLaw::correct
 }
 
 
-void Foam::porosityModels::powerLaw::correct
+void Foam::porosityModels::solidification::correct
 (
     const fvVectorMatrix& UEqn,
     volTensorField& AU
@@ -153,7 +152,7 @@ void Foam::porosityModels::powerLaw::correct
 }
 
 
-bool Foam::porosityModels::powerLaw::writeData(Ostream& os) const
+bool Foam::porosityModels::solidification::writeData(Ostream& os) const
 {
     os  << indent << name_ << endl;
     dict_.write(os);

@@ -2,7 +2,7 @@
   =========                 |
   \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
    \\    /   O peration     |
-    \\  /    A nd           | Copyright (C) 2012-2017 OpenFOAM Foundation
+    \\  /    A nd           | Copyright (C) 2017 OpenFOAM Foundation
      \\/     M anipulation  |
 -------------------------------------------------------------------------------
 License
@@ -22,31 +22,70 @@ License
     along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::porosityModels::powerLaw
+    Foam::porosityModels::solidification
 
 Description
-    Power law porosity model, given by:
+    Simple solidification porosity model
+
+    This is a simple approximation to solidification where the solid phase
+    is represented as a porous blockage with the drag-coefficient evaluated from
 
         \f[
-            S = - \rho C_0 |U|^{(C_1 - 1)} U
+            S = - \alpha \rho D(T) U
         \f]
 
     where
     \vartable
-        C_0      | model linear coefficient
-        C_1      | model exponent coefficient
+        \alpha  | Optional phase-fraction of solidifying phase
+        D(T)    | User-defined drag-coefficient as function of temperature
     \endvartable
 
+    Note that the latent heat of solidification is not included and the
+    temperature is unchanged by the modelled change of phase.
+
+    Example of the solidification model specification:
+    \verbatim
+        type            solidification;
+
+        solidificationCoeffs
+        {
+            // Solidify between 330K and 330.5K
+            D table
+            (
+                (330.0     10000) // Solid below 330K
+                (330.5     0)     // Liquid above 330.5K
+            );
+
+            // Optional phase-fraction of solidifying phase
+            alpha alpha.liquid;
+
+            // Solidification porosity is isotropic
+            // use the global coordinate system
+            coordinateSystem
+            {
+                type    cartesian;
+                origin  (0 0 0);
+                coordinateRotation
+                {
+                    type    axesRotation;
+                    e1      (1 0 0);
+                    e2      (0 1 0);
+                }
+            }
+        }
+    \endverbatim
+
 SourceFiles
-    powerLaw.C
-    powerLawTemplates.C
+    solidification.C
+    solidificationTemplates.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef powerLaw_H
-#define powerLaw_H
+#ifndef solidification_H
+#define solidification_H
 
 #include "porosityModel.H"
+#include "Function1.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -56,26 +95,50 @@ namespace porosityModels
 {
 
 /*---------------------------------------------------------------------------*\
-                      Class powerLaw Declaration
+                      Class solidification Declaration
 \*---------------------------------------------------------------------------*/
 
-class powerLaw
+class solidification
 :
     public porosityModel
 {
     // Private data
 
-        //- C0 coefficient
-        scalar C0_;
+        //- Name of temperature field, default = "T"
+        word TName_;
 
-        //- C1 coefficient
-        scalar C1_;
+        //- Name of optional phase-fraction field, default = "none"
+        word alphaName_;
 
-        //- Name of density field
+        //- Name of density field, default = "rho"
         word rhoName_;
+
+        //- User-defined drag-coefficient as function of temperature
+        autoPtr<Function1<scalar>> D_;
 
 
     // Private Member Functions
+
+        //- Apply resistance
+        template<class AlphaFieldType, class RhoFieldType>
+        void apply
+        (
+            scalarField& Udiag,
+            const scalarField& V,
+            const AlphaFieldType& alpha,
+            const RhoFieldType& rho,
+            const volVectorField& U
+        ) const;
+
+        //- Apply resistance
+        template<class AlphaFieldType, class RhoFieldType>
+        void apply
+        (
+            tensorField& AU,
+            const AlphaFieldType& alpha,
+            const RhoFieldType& rho,
+            const volVectorField& U
+        ) const;
 
         //- Apply resistance
         template<class RhoFieldType>
@@ -84,7 +147,7 @@ class powerLaw
             scalarField& Udiag,
             const scalarField& V,
             const RhoFieldType& rho,
-            const vectorField& U
+            const volVectorField& U
         ) const;
 
         //- Apply resistance
@@ -93,23 +156,23 @@ class powerLaw
         (
             tensorField& AU,
             const RhoFieldType& rho,
-            const vectorField& U
+            const volVectorField& U
         ) const;
 
         //- Disallow default bitwise copy construct
-        powerLaw(const powerLaw&);
+        solidification(const solidification&);
 
         //- Disallow default bitwise assignment
-        void operator=(const powerLaw&);
+        void operator=(const solidification&);
 
 
 public:
 
     //- Runtime type information
-    TypeName("powerLaw");
+    TypeName("solidification");
 
     //- Constructor
-    powerLaw
+    solidification
     (
         const word& name,
         const word& modelType,
@@ -119,7 +182,7 @@ public:
     );
 
     //- Destructor
-    virtual ~powerLaw();
+    virtual ~solidification();
 
 
     // Member Functions
@@ -169,7 +232,7 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #ifdef NoRepository
-    #include "powerLawTemplates.C"
+    #include "solidificationTemplates.C"
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
